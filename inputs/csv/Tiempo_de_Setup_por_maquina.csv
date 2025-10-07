@@ -1,0 +1,7 @@
+﻿MAQUINA,TIPO_CAJA_ACTUAL,TIPO_CAJA_A_CAMBIAR,SETUP
+m1,c1,c2,1
+m1,c2,c1,2
+m2,c1,c2,1
+m2,c2,c1,2
+m3,c1,c2,4
+m3,c2,c1,3
