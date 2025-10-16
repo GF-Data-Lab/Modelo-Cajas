@@ -61,15 +61,22 @@ if not solution_path.exists():
 # CARGAR RESULTADOS
 # =============================================================================
 
-try:
-    with open(solution_path, 'r', encoding='utf-8') as f:
-        solution = json.load(f)
+# Cargar o recuperar de session_state
+if 'solution_data' not in st.session_state or st.button("🔄 Recargar resultados"):
+    try:
+        with open(solution_path, 'r', encoding='utf-8') as f:
+            solution = json.load(f)
 
-    st.success("✅ Resultados cargados correctamente")
+        # Guardar en session_state
+        st.session_state.solution_data = solution
+        st.success("✅ Resultados cargados correctamente")
 
-except Exception as e:
-    st.error(f"❌ Error al cargar solution.json: {str(e)}")
-    st.stop()
+    except Exception as e:
+        st.error(f"❌ Error al cargar solution.json: {str(e)}")
+        st.stop()
+else:
+    solution = st.session_state.solution_data
+    st.info("📊 Mostrando resultados guardados en la sesión")
 
 # =============================================================================
 # INFORMACIÓN GENERAL
@@ -132,37 +139,64 @@ def procesar_solucion(sol_dict):
 
             # Extraer variables
             if 'variables' in cplex_sol:
-                vars_data = cplex_sol['variables'].get('variable', [])
-                if isinstance(vars_data, dict):
-                    vars_data = [vars_data]
+                vars_data = cplex_sol['variables']
+
+                # Si variables es un diccionario con clave 'variable'
+                if isinstance(vars_data, dict) and 'variable' in vars_data:
+                    vars_data = vars_data['variable']
+                    if isinstance(vars_data, dict):
+                        vars_data = [vars_data]
+                # Si variables es directamente una lista
+                elif isinstance(vars_data, list):
+                    pass  # Ya es una lista
+                else:
+                    vars_data = []
 
                 for var in vars_data:
+                    # Manejar ambos formatos: con @ o sin @
+                    nombre = var.get('name', var.get('@name', ''))
+                    valor = var.get('value', var.get('@value', 0))
+                    index = var.get('index', var.get('@index', ''))
+
                     data['variables'].append({
-                        'nombre': var.get('@name', ''),
-                        'valor': float(var.get('@value', 0)),
-                        'index': var.get('@index', '')
+                        'nombre': nombre,
+                        'valor': float(valor),
+                        'index': str(index)
                     })
 
             # Extraer KPIs del header
             header = cplex_sol.get('header', {})
             data['kpis'] = {
                 'objective_value': header.get('objectiveValue', 0),
-                'solve_time': header.get('solutionTime', 0),
-                'status': header.get('solutionStatusString', 'N/A')
+                'solve_time': header.get('solutionTime', header.get('solveTime', 0)),
+                'status': header.get('solutionStatusString', header.get('status', 'N/A'))
             }
 
     except Exception as e:
         st.error(f"Error procesando solución: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
 
     return data
 
 # Procesar solución
 data_procesada = procesar_solucion(solution)
 
+# Guardar en session_state
+st.session_state.data_procesada = data_procesada
+
 # Convertir a DataFrame
 if data_procesada['variables']:
     df_variables = pd.DataFrame(data_procesada['variables'])
-    df_variables = df_variables[df_variables['valor'] > 0.01]  # Filtrar valores significativos
+
+    # Guardar DataFrame completo en session_state
+    st.session_state.df_variables_completo = df_variables.copy()
+
+    # Filtrar valores significativos
+    df_variables = df_variables[df_variables['valor'] > 0.01]
+    st.session_state.df_variables = df_variables
+
+    st.success(f"✅ {len(data_procesada['variables'])} variables procesadas, {len(df_variables)} con valor significativo (>0.01)")
 else:
     df_variables = pd.DataFrame()
     st.warning("⚠️ No se encontraron variables en la solución")
@@ -198,6 +232,72 @@ if data_procesada['kpis']:
             st.metric("Variables Activas", 0)
 
 st.markdown("---")
+
+# =============================================================================
+# TABLA DE RESULTADOS PRINCIPAL
+# =============================================================================
+
+st.subheader("📋 Tabla de Resultados - Variables de Decisión")
+
+if not df_variables.empty:
+
+    # Selector de vista
+    col_vista1, col_vista2 = st.columns(2)
+    with col_vista1:
+        mostrar_todas = st.checkbox("Mostrar todas las variables (incluye valores pequeños)", value=False)
+    with col_vista2:
+        if mostrar_todas:
+            st.info(f"Mostrando {len(st.session_state.df_variables_completo)} variables totales")
+        else:
+            st.info(f"Mostrando {len(df_variables)} variables con valor > 0.01")
+
+    # Seleccionar DataFrame según opción
+    df_mostrar = st.session_state.df_variables_completo if mostrar_todas else df_variables
+
+    # Ordenar por valor descendente
+    df_mostrar_sorted = df_mostrar.sort_values('valor', ascending=False).reset_index(drop=True)
+
+    # Agregar columna de número de fila
+    df_display = df_mostrar_sorted.copy()
+    df_display.insert(0, '#', range(1, len(df_display) + 1))
+
+    # Formatear valores
+    df_display['valor'] = df_display['valor'].apply(lambda x: f"{x:.6f}")
+
+    # Mostrar tabla con scroll
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        height=400,
+        hide_index=True
+    )
+
+    # Botones de descarga
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        csv_filtered = df_mostrar_sorted.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Descargar tabla actual (CSV)",
+            csv_filtered,
+            f"variables_solucion_{'completo' if mostrar_todas else 'filtrado'}.csv",
+            "text/csv",
+            key='download-table-csv'
+        )
+
+    with col_d2:
+        csv_completo = st.session_state.df_variables_completo.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Descargar todas las variables (CSV)",
+            csv_completo,
+            "variables_solucion_completo.csv",
+            "text/csv",
+            key='download-all-csv'
+        )
+
+    st.markdown("---")
+
+else:
+    st.info("No hay variables para mostrar en la tabla")
 
 # =============================================================================
 # ANÁLISIS DE VARIABLES
