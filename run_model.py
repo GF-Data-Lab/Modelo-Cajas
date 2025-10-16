@@ -34,7 +34,8 @@ from pathlib import Path
 EXCEL_PATH = Path("inputs/Parametros.xlsx")   # ajusta si lo tienes en otra ruta
 OUT_DIR = Path("inputs/csv")                  # generaremos aquí los CSV
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-
+demanda = pd.read_excel("inputs/Libro7.xlsx")
+demanda.to_csv("inputs/csv/demanda.csv")
 # Mapea: nombre de hoja -> nombre de archivo CSV
 SHEETS = {
     "Turnos": "Turnos.csv",
@@ -74,6 +75,7 @@ FILES_TO_ADD = [
     ("./inputs/csv/Productividad_Maquina_Caja.csv", "Productividad_Maquina_Caja.csv"),
     ("./inputs/csv/Tiempo_de_Setup_por_maquina.csv", "Tiempo_de_Setup_por_maquina.csv"),
     ("./inputs/csv/Duracion_Turno.csv", "Duracion_Turno.csv"),
+    (".inputs/csv/demanda.csv", "demanda.csv")
 ]
 
 if os.path.exists(MODEL_TAR):
