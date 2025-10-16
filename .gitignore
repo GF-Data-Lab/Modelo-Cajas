@@ -1,0 +1,44 @@
+# Entornos virtuales de Python
+venv/
+venv311/
+env/
+ENV/
+.venv/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Archivos temporales y generados
+modelo.tar.gz
+inputs/csv/
+*.csv
+solution.json
+log.txt
+
+# Archivos de configuración local
+.claude/settings.local.json
+*.local.json
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+nul
+
+# Logs
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Outputs temporales
+outputs/*.json
+outputs/*.txt

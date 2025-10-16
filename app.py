@@ -1,11 +1,12 @@
 import streamlit as st
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).parent))
+from styles.common_styles import configure_page, COMMON_STYLES
+from utils import show_logo
 
-st.set_page_config(
-    page_title="Optimización de Cajas",
-    page_icon="📦",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Configurar página con estilos comunes
+configure_page("Optimización de Cajas", "📦", "wide")
 
 # Inicializar session state
 if 'inicializado' not in st.session_state:
@@ -16,8 +17,21 @@ if 'inicializado' not in st.session_state:
     st.session_state.ultima_ejecucion = None
     st.session_state.datos_cargados = False
 
+    # Nuevas variables para el flujo actualizado
+    st.session_state.parametros_validado = False
+    st.session_state.demanda_validado = False
+    st.session_state.parametros_dict = {}
+    st.session_state.demanda_df = None
+    st.session_state.parametros_nombre = ""
+    st.session_state.demanda_nombre = ""
+    st.session_state.planta_seleccionada = None
+    st.session_state.modelo_ejecutado = False
+    st.session_state.ultima_planta = None
+
 # Sidebar
 with st.sidebar:
+    show_logo()
+    st.markdown("---")
     st.title("📦 Modelo de Cajas")
     st.markdown("---")
 
