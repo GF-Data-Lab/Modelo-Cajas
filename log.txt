@@ -1,1 +1,10 @@
-[2025-10-16T18:44:49.449Z, WARNING] DO Runtime 24.1 on Python 3.11 is used as default with pandas 2.1.1 libraries.
+[2025-10-17T03:49:22.118Z, WARNING] DO Runtime 24.1 on Python 3.11 is used as default with pandas 2.1.1 libraries.
+[2025-10-17T03:49:22.754Z, INFO] [Info] Slots por día: 224 (6 máquinas × 2 turnos × 2 segmentos).
+[2025-10-17T03:49:22.763Z, SEVERE] KeyError : "Faltan claves en Disp, ej: [('M1', 1), ('M1', 2), ('M1', 3), ('M1', 4), ('M1', 5)] (total=112)"
+Traceback (most recent call last):
+  File "/var/job_processor/work/tmp/python/job4273093669200286981.tmp/model.py", line 558, in <module>
+    mdl, x, y, Tsetup = build_model(
+                        ^^^^^^^^^^^^
+  File "/var/job_processor/work/tmp/python/job4273093669200286981.tmp/model.py", line 338, in build_model
+    raise KeyError(f"Faltan claves en Disp, ej: {missing_disp[:5]} (total={len(missing_disp)})")
+

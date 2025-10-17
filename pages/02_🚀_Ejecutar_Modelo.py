@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import subprocess
 import sys
+from run_model import run
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from styles.common_styles import configure_page
@@ -177,47 +178,24 @@ if plantas_disponibles:
                 with st.spinner("Procesando datos y ejecutando modelo..."):
                     try:
                         # Ejecutar run_model.py
-                        result = subprocess.run(
-                            [sys.executable, "run_model.py", planta],
-                            capture_output=True,
-                            text=True,
-                            timeout=600  # 10 minutos
-                        )
+                        result = run(planta)
 
                         # Verificar resultado
-                        if result.returncode == 0:
-                            st.success("✅ Modelo ejecutado exitosamente!")
-
-                            # Mostrar salida
-                            with st.expander("📋 Log de Ejecución", expanded=False):
-                                st.code(result.stdout, language="text")
 
                             # Guardar en session state
-                            st.session_state['ultima_ejecucion'] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-                            st.session_state['modelo_ejecutado'] = True
-                            st.session_state['ultima_planta'] = planta
+                        st.session_state['ultima_ejecucion'] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+                        st.session_state['modelo_ejecutado'] = True
+                        st.session_state['ultima_planta'] = planta
 
                             # Verificar archivos de salida
-                            if Path("solution.json").exists():
-                                st.success("✅ solution.json generado")
+                        if Path("solution.json").exists():
+                            st.success("✅ solution.json generado")
 
-                            if Path("log.txt").exists():
-                                st.success("✅ log.txt generado")
+                        if Path("log.txt").exists():
+                            st.success("✅ log.txt generado")
 
-                            st.balloons()
-                            st.info("👉 Ve a la página **Resultados** para ver el análisis detallado")
-
-                        else:
-                            st.error("❌ Error al ejecutar el modelo")
-
-                            with st.expander("❗ Ver Errores", expanded=True):
-                                st.markdown("**STDERR:**")
-                                st.code(result.stderr, language="text")
-                                st.markdown("**STDOUT:**")
-                                st.code(result.stdout, language="text")
-
-                    except subprocess.TimeoutExpired:
-                        st.error("⏱️ El modelo excedió el tiempo límite de 10 minutos")
+                        st.balloons()
+                        st.info("👉 Ve a la página **Resultados** para ver el análisis detallado")
 
                     except Exception as e:
                         st.error(f"❌ Error inesperado: {str(e)}")
