@@ -11,6 +11,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from styles.common_styles import configure_page
 from utils import show_logo
+from mapeo_nombres import obtener_mapeador
 
 # Configurar página
 configure_page("Resultados", "📊", "wide")
@@ -179,15 +180,32 @@ def procesar_solucion(sol_dict):
 
     return data
 
+# Inicializar mapeador de nombres
+try:
+    mapeador = obtener_mapeador()
+    mapeo_disponible = True
+    st.success(f"✅ Mapeo de nombres cargado: {len(mapeador.obtener_mapeo_maquinas())} máquinas, {len(mapeador.obtener_mapeo_cajas())} tipos de caja")
+except Exception as e:
+    st.warning(f"⚠️ No se pudo cargar el mapeo de nombres: {e}")
+    mapeador = None
+    mapeo_disponible = False
+
 # Procesar solución
 data_procesada = procesar_solucion(solution)
 
 # Guardar en session_state
 st.session_state.data_procesada = data_procesada
+st.session_state.mapeador = mapeador
 
 # Convertir a DataFrame
 if data_procesada['variables']:
     df_variables = pd.DataFrame(data_procesada['variables'])
+
+    # Agregar columna con descripción legible si hay mapeo
+    if mapeo_disponible and mapeador:
+        df_variables['descripcion'] = df_variables['nombre'].apply(
+            lambda x: mapeador.mapear_variable_completa(x)
+        )
 
     # Guardar DataFrame completo en session_state
     st.session_state.df_variables_completo = df_variables.copy()
@@ -234,6 +252,279 @@ if data_procesada['kpis']:
 st.markdown("---")
 
 # =============================================================================
+# INTERPRETACIÓN DE RESULTADOS
+# =============================================================================
+
+st.subheader("🔍 Interpretación de Resultados")
+
+with st.expander("📖 Guía de Interpretación", expanded=True):
+    st.markdown("""
+    ### Tipos de Variables en la Solución
+
+    El modelo de optimización utiliza dos tipos de variables principales:
+
+    #### 🔹 Variables de Asignación (x)
+    **Formato:** `x_mX_cY_D_T_S`
+    - **Significado:** Indica si una máquina produce un tipo de caja en un día y turno específico
+    - **Valor:** 1.0 = Asignado, 0.0 = No asignado
+    - **Componentes:**
+      - `mX`: Máquina (m1, m2, m3, ...)
+      - `cY`: Tipo de caja (c1, c2, c3, ...)
+      - `D`: Día de planificación (1-7)
+      - `T`: Turno del día (1, 2, 3, ...)
+      - `S`: Secuencia o periodo adicional
+
+    **Ejemplo:** `x_m1_c2_3_4_1 = 1.0`
+    - Máquina 1 (m1) está asignada para producir Caja 2 (c2) el Día 3, Turno 4
+
+    #### 🔹 Variables de Producción/Tiempo (y)
+    **Formato:** `y_mX_cY_D_T_S`
+    - **Significado:** Cantidad o tiempo de producción de un tipo de caja
+    - **Valor:** Números decimales (horas, cajas, o porcentaje del turno)
+    - **Componentes:** Igual que variables x
+
+    **Ejemplo:** `y_m2_c1_5_2_1 = 0.0391`
+    - En Máquina 2, Caja 1, Día 5, Turno 2 se producen/utilizan 0.0391 unidades (horas/cajas)
+
+    ---
+
+    ### 📊 Objetivo del Modelo
+
+    El modelo busca **minimizar el tiempo total de setup** (cambios de configuración entre tipos de caja),
+    mientras se cumple con toda la demanda planificada y se respetan las capacidades de las máquinas.
+
+    #### Restricciones consideradas:
+    - ✅ **Demanda:** Toda la demanda de cajas debe ser satisfecha
+    - ✅ **Capacidad:** Las máquinas no pueden exceder su tiempo disponible por turno
+    - ✅ **Disponibilidad:** Solo se usan máquinas disponibles en cada día
+    - ✅ **Productividad:** Se respetan las tasas de producción específicas de cada máquina-caja
+    - ✅ **Setup:** Se minimizan los cambios de tipo de caja en cada máquina
+    """)
+
+st.markdown("---")
+
+# =============================================================================
+# RESUMEN EJECUTIVO MEJORADO
+# =============================================================================
+
+st.subheader("📊 Resumen Ejecutivo del Plan de Producción")
+
+if not df_variables.empty:
+
+    # Analizar variables de asignación (x)
+    df_asignaciones = df_variables[df_variables['nombre'].str.startswith('x_')].copy()
+    df_produccion = df_variables[df_variables['nombre'].str.startswith('y_')].copy()
+
+    # Extraer información de las variables
+    def parsear_variable(nombre):
+        """Extrae componentes de la variable."""
+        partes = nombre.split('_')
+        if len(partes) >= 5:
+            return {
+                'tipo': partes[0],
+                'maquina': partes[1],
+                'caja': partes[2],
+                'dia': partes[3],
+                'turno': partes[4] if len(partes) > 4 else '1'
+            }
+        return None
+
+    # Aplicar parsing a asignaciones
+    if len(df_asignaciones) > 0:
+        df_asignaciones['parsed'] = df_asignaciones['nombre'].apply(parsear_variable)
+        df_asignaciones = df_asignaciones[df_asignaciones['parsed'].notna()].copy()
+
+        # Expandir columnas
+        df_asignaciones['maquina'] = df_asignaciones['parsed'].apply(lambda x: x['maquina'] if x else None)
+        df_asignaciones['caja'] = df_asignaciones['parsed'].apply(lambda x: x['caja'] if x else None)
+        df_asignaciones['dia'] = df_asignaciones['parsed'].apply(lambda x: x['dia'] if x else None)
+        df_asignaciones['turno'] = df_asignaciones['parsed'].apply(lambda x: x['turno'] if x else None)
+
+        # Agregar nombres reales si hay mapeo disponible
+        if mapeo_disponible and mapeador:
+            df_asignaciones['maquina_nombre'] = df_asignaciones['maquina'].apply(
+                lambda x: mapeador.mapear_maquina(x) if x else x
+            )
+            df_asignaciones['caja_nombre'] = df_asignaciones['caja'].apply(
+                lambda x: mapeador.mapear_caja(x) if x else x
+            )
+            df_asignaciones['dia_nombre'] = df_asignaciones['dia'].apply(
+                lambda x: mapeador.mapear_dia(x) if x else x
+            )
+
+        # Métricas principales
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            n_maquinas = df_asignaciones['maquina'].nunique()
+            st.metric("🏭 Máquinas Utilizadas", n_maquinas)
+
+        with col2:
+            n_cajas = df_asignaciones['caja'].nunique()
+            st.metric("📦 Tipos de Caja", n_cajas)
+
+        with col3:
+            n_dias = df_asignaciones['dia'].nunique()
+            st.metric("📅 Días Programados", n_dias)
+
+        with col4:
+            n_asignaciones = len(df_asignaciones)
+            st.metric("🔄 Asignaciones Totales", n_asignaciones)
+
+        st.markdown("---")
+
+        # Análisis por máquina
+        st.markdown("### 🏭 Utilización por Máquina")
+
+        # Usar nombres reales si están disponibles
+        grupo_maquina = 'maquina_nombre' if 'maquina_nombre' in df_asignaciones.columns else 'maquina'
+
+        asignaciones_por_maquina = df_asignaciones.groupby(grupo_maquina).agg({
+            'nombre': 'count',
+            'caja': lambda x: x.nunique(),
+            'dia': lambda x: x.nunique()
+        }).reset_index()
+        asignaciones_por_maquina.columns = ['Máquina', 'Total Asignaciones', 'Tipos de Caja', 'Días Trabajados']
+
+        st.dataframe(asignaciones_por_maquina, use_container_width=True, hide_index=True)
+
+        # Gráfico de asignaciones por máquina
+        fig_maquinas = px.bar(
+            asignaciones_por_maquina,
+            x='Máquina',
+            y='Total Asignaciones',
+            title='Asignaciones por Máquina',
+            color='Total Asignaciones',
+            color_continuous_scale='Viridis',
+            text='Total Asignaciones'
+        )
+        fig_maquinas.update_traces(textposition='outside')
+        fig_maquinas.update_layout(
+            height=500,
+            xaxis_tickangle=-45
+        )
+        st.plotly_chart(fig_maquinas, use_container_width=True)
+
+        st.markdown("---")
+
+        # Análisis por día
+        st.markdown("### 📅 Programación por Día")
+
+        asignaciones_por_dia = df_asignaciones.groupby('dia').agg({
+            'nombre': 'count',
+            'maquina': lambda x: x.nunique(),
+            'caja': lambda x: x.nunique()
+        }).reset_index()
+        asignaciones_por_dia.columns = ['Día', 'Total Asignaciones', 'Máquinas Activas', 'Tipos de Caja']
+        asignaciones_por_dia = asignaciones_por_dia.sort_values('Día')
+
+        # Gráfico de líneas por día
+        fig_dias = go.Figure()
+        fig_dias.add_trace(go.Scatter(
+            x=asignaciones_por_dia['Día'],
+            y=asignaciones_por_dia['Total Asignaciones'],
+            mode='lines+markers',
+            name='Asignaciones',
+            line=dict(color='#1f77b4', width=3),
+            marker=dict(size=10)
+        ))
+        fig_dias.add_trace(go.Scatter(
+            x=asignaciones_por_dia['Día'],
+            y=asignaciones_por_dia['Máquinas Activas'],
+            mode='lines+markers',
+            name='Máquinas Activas',
+            line=dict(color='#ff7f0e', width=3),
+            marker=dict(size=10),
+            yaxis='y2'
+        ))
+        fig_dias.update_layout(
+            title='Actividad de Producción por Día',
+            xaxis_title='Día',
+            yaxis_title='Asignaciones',
+            yaxis2=dict(title='Máquinas', overlaying='y', side='right'),
+            height=400,
+            hovermode='x unified'
+        )
+        st.plotly_chart(fig_dias, use_container_width=True)
+
+        st.dataframe(asignaciones_por_dia, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+
+        # Análisis por tipo de caja
+        st.markdown("### 📦 Producción por Tipo de Caja")
+
+        # Usar nombres reales si están disponibles
+        grupo_caja = 'caja_nombre' if 'caja_nombre' in df_asignaciones.columns else 'caja'
+
+        asignaciones_por_caja = df_asignaciones.groupby(grupo_caja).agg({
+            'nombre': 'count',
+            'maquina': lambda x: x.nunique(),
+            'dia': lambda x: x.nunique()
+        }).reset_index()
+        asignaciones_por_caja.columns = ['Tipo de Caja', 'Total Asignaciones', 'Máquinas Usadas', 'Días de Producción']
+
+        st.dataframe(asignaciones_por_caja, use_container_width=True, hide_index=True)
+
+        # Gráfico de barras por tipo de caja
+        fig_cajas = px.bar(
+            asignaciones_por_caja,
+            x='Tipo de Caja',
+            y='Total Asignaciones',
+            title='Asignaciones por Tipo de Caja',
+            color='Máquinas Usadas',
+            color_continuous_scale='Teal',
+            text='Total Asignaciones'
+        )
+        fig_cajas.update_traces(textposition='outside')
+        fig_cajas.update_layout(
+            height=500,
+            xaxis_tickangle=-45
+        )
+        st.plotly_chart(fig_cajas, use_container_width=True)
+
+        st.markdown("---")
+
+        # Matriz de asignación Máquina-Caja
+        st.markdown("### 🔄 Matriz de Asignación: Máquina × Tipo de Caja")
+
+        # Usar nombres reales si están disponibles
+        col_maquina_heatmap = 'maquina_nombre' if 'maquina_nombre' in df_asignaciones.columns else 'maquina'
+        col_caja_heatmap = 'caja_nombre' if 'caja_nombre' in df_asignaciones.columns else 'caja'
+
+        matriz_maquina_caja = df_asignaciones.groupby([col_maquina_heatmap, col_caja_heatmap]).size().reset_index(name='asignaciones')
+        matriz_pivot = matriz_maquina_caja.pivot(index=col_maquina_heatmap, columns=col_caja_heatmap, values='asignaciones').fillna(0)
+
+        fig_heatmap = px.imshow(
+            matriz_pivot,
+            labels=dict(x="Tipo de Caja", y="Máquina", color="Asignaciones"),
+            title="Mapa de Calor: Asignaciones Máquina × Caja",
+            color_continuous_scale='YlOrRd',
+            text_auto=True
+        )
+        fig_heatmap.update_layout(
+            height=600,
+            xaxis_tickangle=-45
+        )
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+
+        st.info("""
+        **💡 Interpretación del mapa de calor:**
+        - Valores más altos (rojo) indican que esa máquina produce frecuentemente ese tipo de caja
+        - Valores bajos (amarillo) indican producción ocasional
+        - Casillas en blanco = sin asignaciones
+        - Este mapa ayuda a identificar qué máquinas son especializadas en ciertos tipos de caja
+        """)
+
+    else:
+        st.warning("No se encontraron variables de asignación (x_) en los resultados")
+
+else:
+    st.info("No hay datos suficientes para generar el resumen ejecutivo")
+
+st.markdown("---")
+
+# =============================================================================
 # TABLA DE RESULTADOS PRINCIPAL
 # =============================================================================
 
@@ -261,15 +552,32 @@ if not df_variables.empty:
     df_display = df_mostrar_sorted.copy()
     df_display.insert(0, '#', range(1, len(df_display) + 1))
 
+    # Reorganizar columnas para mostrar descripción si está disponible
+    if 'descripcion' in df_display.columns:
+        # Colocar descripción después del nombre
+        cols = df_display.columns.tolist()
+        cols_reordenadas = ['#', 'nombre', 'descripcion', 'valor']
+        # Agregar cualquier otra columna que no hayamos especificado
+        for col in cols:
+            if col not in cols_reordenadas:
+                cols_reordenadas.append(col)
+        df_display = df_display[cols_reordenadas]
+
     # Formatear valores
-    df_display['valor'] = df_display['valor'].apply(lambda x: f"{x:.6f}")
+    df_display['valor'] = df_display['valor'].apply(lambda x: f"{x:.6f}" if isinstance(x, (int, float)) else x)
 
     # Mostrar tabla con scroll
     st.dataframe(
         df_display,
         use_container_width=True,
         height=400,
-        hide_index=True
+        hide_index=True,
+        column_config={
+            "#": st.column_config.NumberColumn("#", width="small"),
+            "nombre": st.column_config.TextColumn("Código Variable", width="medium"),
+            "descripcion": st.column_config.TextColumn("Descripción", width="large"),
+            "valor": st.column_config.TextColumn("Valor", width="small"),
+        } if 'descripcion' in df_display.columns else None
     )
 
     # Botones de descarga
