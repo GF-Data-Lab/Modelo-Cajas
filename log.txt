@@ -1,10 +1,53 @@
-[2025-10-17T03:49:22.118Z, WARNING] DO Runtime 24.1 on Python 3.11 is used as default with pandas 2.1.1 libraries.
-[2025-10-17T03:49:22.754Z, INFO] [Info] Slots por día: 224 (6 máquinas × 2 turnos × 2 segmentos).
-[2025-10-17T03:49:22.763Z, SEVERE] KeyError : "Faltan claves en Disp, ej: [('M1', 1), ('M1', 2), ('M1', 3), ('M1', 4), ('M1', 5)] (total=112)"
-Traceback (most recent call last):
-  File "/var/job_processor/work/tmp/python/job4273093669200286981.tmp/model.py", line 558, in <module>
-    mdl, x, y, Tsetup = build_model(
-                        ^^^^^^^^^^^^
-  File "/var/job_processor/work/tmp/python/job4273093669200286981.tmp/model.py", line 338, in build_model
-    raise KeyError(f"Faltan claves en Disp, ej: {missing_disp[:5]} (total={len(missing_disp)})")
-
+[2025-10-20T01:38:58.888Z, WARNING] DO Runtime 24.1 on Python 3.11 is used as default with pandas 2.1.1 libraries.
+[2025-10-20T01:38:59.696Z, INFO] MOLINA
+[2025-10-20T01:38:59.703Z, INFO] ['MOLINA']
+[2025-10-20T01:38:59.706Z, INFO] ['MOLINA']
+[2025-10-20T01:38:59.721Z, INFO] 1            BLISS 500*300
+[2025-10-20T01:38:59.722Z, INFO] 2            BLISS 500*300
+[2025-10-20T01:38:59.724Z, INFO] 3            BLISS 500*300
+[2025-10-20T01:38:59.725Z, INFO] 60           FONDO 5 KILOS
+[2025-10-20T01:38:59.740Z, INFO] 61           FONDO 5 KILOS
+[2025-10-20T01:38:59.741Z, INFO] 62    MASTER 2 X 2,5 KILOS
+[2025-10-20T01:38:59.742Z, INFO] 63           FONDO 5 KILOS
+[2025-10-20T01:38:59.743Z, INFO] 64    MASTER 2 X 2,5 KILOS
+[2025-10-20T01:38:59.745Z, INFO] Name: cod_envase, dtype: object
+[2025-10-20T01:38:59.761Z, INFO] 1     1
+[2025-10-20T01:38:59.764Z, INFO] 2     1
+[2025-10-20T01:38:59.766Z, INFO] 3     1
+[2025-10-20T01:38:59.778Z, INFO] 60    1
+[2025-10-20T01:38:59.780Z, INFO] 61    3
+[2025-10-20T01:38:59.783Z, INFO] 62    2
+[2025-10-20T01:38:59.785Z, INFO] 63    2
+[2025-10-20T01:38:59.787Z, INFO] 64    2
+[2025-10-20T01:38:59.796Z, INFO] Name: DIA, dtype: int64
+[2025-10-20T01:38:59.800Z, INFO] ['M1', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9'] [1, 3, 2]
+[2025-10-20T01:38:59.802Z, INFO] 3792.0
+[2025-10-20T01:38:59.805Z, INFO] 2400.0
+[2025-10-20T01:38:59.815Z, INFO] 0.0
+[2025-10-20T01:38:59.818Z, INFO] 0.0
+[2025-10-20T01:38:59.821Z, INFO] 2400.0
+[2025-10-20T01:38:59.823Z, INFO] 0.0
+[2025-10-20T01:38:59.824Z, INFO] 0.0
+[2025-10-20T01:38:59.825Z, INFO] 2400.0
+[2025-10-20T01:38:59.827Z, INFO] 4800.0
+[2025-10-20T01:38:59.836Z, INFO] [Info] Slots por día: 224 (6 máquinas × 2 turnos × 2 segmentos).
+[2025-10-20T01:39:00.002Z, INFO] WARNING: Number of workers has been reduced to 1 to comply with platform limitations.
+[2025-10-20T01:39:00.004Z, INFO] Version identifier: 20.1.0.1 | 2025-03-11 | 53c4b2a41
+[2025-10-20T01:39:00.005Z, INFO] CPXPARAM_Read_DataCheck                          1
+[2025-10-20T01:39:00.007Z, INFO] CPXPARAM_Threads                                 1
+[2025-10-20T01:39:00.016Z, INFO] CPXPARAM_TimeLimit                               60
+[2025-10-20T01:39:00.017Z, INFO] CPXPARAM_MIP_Tolerances_MIPGap                   0.01
+[2025-10-20T01:39:00.020Z, INFO] Legacy callback                                  i
+[2025-10-20T01:39:00.021Z, INFO] Found incumbent of value 855.205325 after 0.00 sec. (0.43 ticks)
+[2025-10-20T01:39:00.022Z, INFO] Tried aggregator 1 time.
+[2025-10-20T01:39:00.024Z, INFO] MIP Presolve eliminated 4872 rows and 4704 columns.
+[2025-10-20T01:39:00.025Z, INFO] MIP Presolve modified 24 coefficients.
+[2025-10-20T01:39:00.037Z, INFO] All rows and columns eliminated.
+[2025-10-20T01:39:00.038Z, INFO] Presolve time = 0.00 sec. (3.43 ticks)
+[2025-10-20T01:39:00.040Z, INFO] 
+[2025-10-20T01:39:00.041Z, INFO] Root node processing (before b&c):
+[2025-10-20T01:39:00.043Z, INFO]   Real time             =    0.00 sec. (4.06 ticks)
+[2025-10-20T01:39:00.044Z, INFO] Sequential b&c:
+[2025-10-20T01:39:00.045Z, INFO]   Real time             =    0.00 sec. (0.00 ticks)
+[2025-10-20T01:39:00.047Z, INFO]                           ------------
+[2025-10-20T01:39:00.048Z, INFO] Total (root+branch&cut) =    0.00 sec. (4.06 ticks)

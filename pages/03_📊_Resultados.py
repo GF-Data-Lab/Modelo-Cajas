@@ -222,6 +222,111 @@ else:
 # =============================================================================
 # MÉTRICAS CLAVE (KPIs)
 # =============================================================================
+# =============================================================================
+# TABLA DETALLADA DE VARIABLES y_ (horas por Máquina/Caja/Día/Turno/Segmento)
+# =============================================================================
+st.subheader("🕒 Cronograma Diario")
+
+import re
+
+def parsear_y_variable(nombre: str):
+    """
+    Parseo robusto de nombres tipo:
+    y_M11_MASTER 2 X 2,5 KILOS_2_1_1
+    y_M6_FONDO 5 KILOS_3_1_2
+
+    Patrón: y_<MAQUINA>_<NOMBRE_CAJA>_<DIA>_<TURNO>_<SEGMENTO>
+    Donde <NOMBRE_CAJA> puede contener espacios y comas.
+    """
+    # Regex: (1) maquina (2) caja (greedy) (3) dia (4) turno (5) segmento
+    patron = r"^y_([^_]+)_(.+)_(\d+)_(\d+)_(\d+)$"
+    m = re.match(patron, nombre)
+    if not m:
+        return None
+    maquina, caja, dia, turno, segmento = m.groups()
+    return {
+        "maquina": maquina.strip(),
+        "caja": caja.strip(),
+        "dia": int(dia),
+        "turno": int(turno),
+        "segmento": int(segmento),
+    }
+
+if not df_variables.empty:
+    # Tomamos todas las y_ (si marcaste "mostrar todas", usa df_mostrar_sorted si quieres)
+    df_y = st.session_state.df_variables_completo.copy()
+    df_y = df_y[df_y["nombre"].str.startswith("y_")].copy()
+
+    if df_y.empty:
+        st.info("No se encontraron variables y_ en la solución.")
+    else:
+        # Parsear columnas
+        parsed = df_y["nombre"].apply(parsear_y_variable)
+        df_y = df_y[parsed.notna()].copy()
+        parsed_dicts = parsed[parsed.notna()]
+
+        df_y["maquina"]  = parsed_dicts.apply(lambda d: d["maquina"])
+        df_y["caja"]     = parsed_dicts.apply(lambda d: d["caja"])
+        df_y["dia"]      = parsed_dicts.apply(lambda d: d["dia"])
+        df_y["turno"]    = parsed_dicts.apply(lambda d: d["turno"])
+        df_y["segmento"] = parsed_dicts.apply(lambda d: d["segmento"])
+
+        # Mapear nombres legibles si hay mapeador
+        if mapeo_disponible and mapeador:
+            df_y["maquina_nombre"] = df_y["maquina"].apply(lambda x: mapeador.mapear_maquina(x) or x)
+            df_y["caja_nombre"]    = df_y["caja"].apply(lambda x: mapeador.mapear_caja(x) or x)
+        else:
+            df_y["maquina_nombre"] = df_y["maquina"]
+            df_y["caja_nombre"]    = df_y["caja"]
+
+        # Renombrar y ordenar columnas para la tabla final
+        df_y_tabla = df_y.rename(columns={
+            "valor": "horas"
+        })[
+            ["maquina", "maquina_nombre", "caja", "caja_nombre", "dia", "turno", "segmento", "horas", "nombre"]
+        ].sort_values(by=["dia", "turno", "maquina_nombre", "caja_nombre", "segmento"]).reset_index(drop=True)
+
+        # Formatear horas a 6 decimales (o lo que prefieras)
+        df_y_tabla["horas"] = df_y_tabla["horas"].astype(float).round(6)
+
+        # Mostrar
+        st.dataframe(
+            df_y_tabla,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "maquina": st.column_config.TextColumn("Código Máquina", width="small"),
+                "maquina_nombre": st.column_config.TextColumn("Máquina", width="medium"),
+                "caja": st.column_config.TextColumn("Código Caja", width="medium"),
+                "caja_nombre": st.column_config.TextColumn("Caja", width="large"),
+                "dia": st.column_config.NumberColumn("Día", width="small"),
+                "turno": st.column_config.NumberColumn("Turno", width="small"),
+                "segmento": st.column_config.NumberColumn("Segmento", width="small"),
+                "horas": st.column_config.NumberColumn("Horas", width="small", format="%.6f"),
+                "nombre": st.column_config.TextColumn("Variable (raw)", width="large"),
+            }
+        )
+
+        # Descarga
+        csv_y = df_y_tabla.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "📥 Descargar variables y_ (CSV)",
+            csv_y,
+            "variables_y_detalle.csv",
+            "text/csv",
+            key="download-y-csv"
+        )
+
+        # (Opcional) Resumen rápido por Máquina/Caja
+        with st.expander("📦 Resumen por Máquina × Caja (suma de horas)", expanded=False):
+            resumen = (
+                df_y_tabla.groupby(["maquina_nombre", "caja_nombre"], as_index=False)["horas"]
+                .sum()
+                .sort_values(["maquina_nombre", "horas"], ascending=[True, False])
+            )
+            st.dataframe(resumen, use_container_width=True, hide_index=True)
+else:
+    st.info("No hay variables para construir la tabla de y_.")
 
 st.subheader("📈 Métricas Clave")
 

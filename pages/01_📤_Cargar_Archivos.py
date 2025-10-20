@@ -277,7 +277,7 @@ if uploaded_demanda is not None:
 
                 with col_c:
                     if 'DESC_ENVASE' in df_demanda.columns:
-                        tipos_envase = df_demanda['DESC_ENVASE'].nunique()
+                        tipos_envase = df_demanda['cod_envase'].nunique()
                         st.metric("Tipos de Envase", tipos_envase)
         else:
             st.error("❌ El archivo tiene errores de validación:")

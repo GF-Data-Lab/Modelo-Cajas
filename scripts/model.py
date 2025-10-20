@@ -15,21 +15,36 @@ class Processing:
         self.df_setup = df_setup[df_setup['PLANTA'] == planta]
         self.df_duracion_turno_dia = df_duracion_turno_dia[df_duracion_turno_dia['PLANTA'] == planta]
         self.df_productividad_maquina_caja = df_productividad_maquina_caja[df_productividad_maquina_caja['PLANTA'] == planta]
-        self.df_demanda = df_demanda[df_demanda['DES_PLANTA'] == planta]
+        self.df_demanda = df_demanda
+        print(planta)
+        print(self.df_demanda['DES_PLANTA'].unique())
+        self.df_demanda = self.df_demanda[self.df_demanda['DES_PLANTA'] == 'MOLINA']
+        print(self.df_demanda['DES_PLANTA'].unique())
         self.inverse_mapping = {
-            'C8535133': ['BLISS 500*300'],
-            'C0546070': ['BRASIL FO/TP'],
-            'C0535096': ['FONDO 5 KILOS', 'TAPA 5 KILOS'],
-            'C0635120': ['MALETA 2 KILOS ,YELLOW , RAINIER'],
-            'C0535102': ['MALETA 2,5 KILOS'],
-            'C4434125': ['MASTER 2 X 2,5 KILOS']
+            'C8535133': 'BLISS 500*300',
+            'C0546070': 'BRASIL FO/TP',
+            'C0535096': 'FONDO 5 KILOS',
+            'C0635120': 'MALETA 2 KILOS ,YELLOW , RAINIER',
+            'C0535102': 'MALETA 2,5 KILOS',
+            'C4434125': 'MASTER 2 X 2,5 KILOS'
         }
 
         self.df_demanda['cod_envase'] = self.df_demanda['cod_envase'].map(lambda x: self.inverse_mapping[x] if x in self.inverse_mapping.keys() else 'KILL')
         self.df_demanda = self.df_demanda[self.df_demanda['cod_envase']!='KILL']
         self.M = sorted(self.df_disponibilidad_maquinas["MAQUINA"].astype(str).unique().tolist())
-        self.D = list(self.df_demanda['fecha_planificación'].unique())
-        self.B = list(self.df_demanda['cod_envase'].unique())
+        dias = [i for i in self.df_demanda['fecha_planificación'].unique()]
+        sorted([i for i in df_estimacion['fecha_planificación'].unique()])
+        print(self.df_demanda['cod_envase'])
+        dias = sorted(dias)
+        mapper = {}
+        counter = 1
+        for dia in dias:
+            mapper[dia] = counter
+            counter+=1
+        self.df_demanda['DIA'] = self.df_demanda['fecha_planificación'].map(lambda x: mapper[x])
+        print(self.df_demanda['DIA'])
+        self.D = list(self.df_demanda['DIA'].unique())
+        self.B = self.df_demanda['cod_envase'].unique()
         self.P = list(self.df_demanda['DES_PLANTA'].unique())
 
         self.Dem = {}
@@ -51,7 +66,7 @@ class Processing:
     def process_demanda(self):
         agrupacion = (
             self.df_demanda
-            .groupby(['cod_envase', 'DES_PLANTA', 'fecha_planificación'], as_index=False)
+            .groupby(['cod_envase', 'DIA'], as_index=False)
             .agg(SUM_CAJAS=('cant_cajas', 'sum'))
         )
 
@@ -59,7 +74,7 @@ class Processing:
         for d in self.D:
               for b in self.B:
                   serie = agrupacion.loc[
-                        (agrupacion['fecha_planificación'] == d) &
+                        (agrupacion['DIA'] == d) &
                         (agrupacion['cod_envase'] == b),
                         'SUM_CAJAS'
                   ]
@@ -72,6 +87,7 @@ class Processing:
     def process_disponibilidad_maquinas(self):
         M = self.M
         D = self.D
+        print(M,D)
         """Construye Disp sobre todo el dominio M×D, rellenando faltantes con 0."""
         df = self.df_disponibilidad_maquinas.copy()
         df["MAQUINA"] = df["MAQUINA"].astype(str)
@@ -301,12 +317,6 @@ class Processing:
         return Dem
 
 
-import pandas as pd
-
-# Las siguientes líneas se comentan para que no se carguen automáticamente
-# Solo se usarán cuando se ejecute el modelo desde línea de comandos
-#
-
 
 
 import sys, subprocess, importlib
@@ -426,6 +436,16 @@ def build_model(
                         for m in M for t in T_turnos[d] for s in S_segmentos) >= demand_db,
                 ctname=f"R1_dem[{b},{d}]"
             )
+    # además de R1_dem (>=), agrega:
+    for d in D:
+        for b in B:
+            demand_db = Dem.get((d, b), 0.0)
+            mdl.add_constraint(
+                mdl.sum(y[(m,b,d,t,s)]*Prod[(m,b)] for m in M for t in T_turnos[d] for s in S_segmentos)
+                <= demand_db * (1 + 1e-6),
+                ctname=f"R1_dem_ub[{b},{d}]"
+            )
+
 
     # --- 5) R2: Tiempo por turno ---
     for m in M:
@@ -510,16 +530,20 @@ def build_model(
     # --- 11) Objetivo ---
     mdl.minimize(mdl.sum(Tsetup_var[(m, d, t)] for (m, d, t) in Tsetup_keys))
 
-    return mdl, x, y, Tsetup_var
+    return mdl, x, y, Tsetup_var, S_segmentos
 
 
-df_turnos = pd.read_csv("Turnos.csv", dtype=str, encoding="utf-8-sig")
-df_disponibilidad_maquinas = pd.read_csv("Disponibilidad_Maquinas.csv", dtype=str, encoding="utf-8-sig")
-df_productividad_maquina_caja = pd.read_csv("Productividad_Maquina_Caja.csv", dtype=str, encoding="utf-8-sig")
-df_tiempo_setup_por_maquina = pd.read_csv("Tiempo_de_Setup_por_maquina.csv", dtype=str, encoding="utf-8-sig")
-df_duracion_turno_dia = pd.read_csv("Duracion_Turno.csv", dtype=str, encoding="utf-8-sig")
-df_estimacion = pd.read_csv("demanda.csv", dtype=str, encoding="utf-8-sig")
-df_planta = pd.read_csv("planta.csv", dtype=str, encoding="utf-8-sig")
+
+
+
+
+df_turnos = pd.read_csv("Turnos.csv")
+df_disponibilidad_maquinas = pd.read_csv("Disponibilidad_Maquinas.csv")
+df_productividad_maquina_caja = pd.read_csv("Productividad_Maquina_Caja.csv")
+df_tiempo_setup_por_maquina = pd.read_csv("Tiempo_de_Setup_por_maquina.csv")
+df_duracion_turno_dia = pd.read_csv("Duracion_Turno.csv")
+df_estimacion = pd.read_csv("demanda.csv")
+df_planta = pd.read_csv("planta.csv")
 
 if __name__ == "__main__":
     # 3) Obtener insumos
@@ -543,19 +567,19 @@ if __name__ == "__main__":
     Prod, Tipo, M, B = proc.process_productividad_y_tipo() # dicts y dominios
     Tturn = proc.process_turn_duration()
     # 4) Armar conjuntos para el modelo
-    D = sorted(T_turnos.keys())
+    D = proc.getDays()
     DT = [(d, t) for d in D for t in T_turnos[d]]    # pares (día, turno) activos
     S_segmentos = [1, 2]
 
     # 5) Demanda (ejemplo: si aún no la traes de un DF, pon 0 o carga tu DF)
     Dem = proc.process_demanda()
-
+   
 
     # Chequeo de slots (informativo)
     slots_por_dia = len(M)*len(T_turnos)*len(S_segmentos)
     print(f"[Info] Slots por día: {slots_por_dia} (6 máquinas × 2 turnos × 2 segmentos).")
 
-    mdl, x, y, Tsetup = build_model(
+    mdl, x, y, Tsetup, k = build_model(
     M,B,D,T_turnos,S_segmentos,
     Disp,Prod,Tipo,Setup,Dem,Tturn,
     enforce_tipo=True,
@@ -570,19 +594,3 @@ if __name__ == "__main__":
     sol = mdl.solve(log_output=True)
     if sol is None:
         print("No factible: si pasa, baja active_max, baja H_max, o sube compatibilidad.")
-    else:
-        print("\n========== RESUMEN ==========")
-        print("OBJ (∑T):", round(mdl.objective_value, 4))
-        total_prod_h = sum(v.solution_value for v in y.values())
-        total_T_h    = sum(v.solution_value for v in Tsetup.values())
-        print(f"Horas de producción totales: {total_prod_h:.2f} h")
-        print(f"Horas de setup totales:      {total_T_h:.2f} h")
-
-        # Verificación de algunas demandas
-        sample_B = random.sample(B, min(5, len(B)))
-        sample_D = random.sample(D, min(2, len(D)))
-        for b in sample_B:
-            for d in sample_D:
-                producido = sum(y[(m,b,d,t,s)].solution_value * Prod[(m,b)]
-                                for m in M for t in T_turnos for s in S_segmentos)
-                print(f"Dem[{b},{d}] -> producido={producido:.1f}  demanda={Dem[(b,d)]}")
